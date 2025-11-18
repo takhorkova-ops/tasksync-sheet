@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { useGoogleSheets } from "@/hooks/useGoogleSheets";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CheckCircle2, Clock, AlertCircle } from "lucide-react";
 
 interface Task {
@@ -15,6 +17,7 @@ interface Task {
 
 const TaskTracker = () => {
   const { data, isLoading, error } = useGoogleSheets();
+  const [filter, setFilter] = useState<"all" | "in-progress" | "done">("all");
 
   if (isLoading) {
     return (
@@ -60,6 +63,37 @@ const TaskTracker = () => {
     dueDate: row[5] || "",
   }));
 
+  const filterTasks = (tasks: Task[]) => {
+    if (filter === "all") return tasks;
+    
+    if (filter === "done") {
+      return tasks.filter(task => 
+        task.status.toLowerCase().includes("завершен") || 
+        task.status.toLowerCase().includes("done")
+      );
+    }
+    
+    if (filter === "in-progress") {
+      return tasks.filter(task => 
+        task.status.toLowerCase().includes("процесс") || 
+        task.status.toLowerCase().includes("progress")
+      );
+    }
+    
+    return tasks;
+  };
+
+  const filteredTasks = filterTasks(tasks);
+  const allCount = tasks.length;
+  const inProgressCount = tasks.filter(task => 
+    task.status.toLowerCase().includes("процесс") || 
+    task.status.toLowerCase().includes("progress")
+  ).length;
+  const doneCount = tasks.filter(task => 
+    task.status.toLowerCase().includes("завершен") || 
+    task.status.toLowerCase().includes("done")
+  ).length;
+
   const getStatusIcon = (status: string) => {
     const normalizedStatus = status.toLowerCase();
     if (normalizedStatus.includes("завершен") || normalizedStatus.includes("done")) {
@@ -82,9 +116,16 @@ const TaskTracker = () => {
     return "secondary";
   };
 
-  return (
-    <div className="space-y-4">
-      {tasks.map((task) => (
+  const TaskList = ({ tasks }: { tasks: Task[] }) => (
+    <div className="space-y-4 mt-6">
+      {tasks.length === 0 ? (
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-center text-muted-foreground">Задачи не найдены</p>
+          </CardContent>
+        </Card>
+      ) : (
+        tasks.map((task) => (
         <Card key={task.id} className="hover:shadow-lg transition-shadow">
           <CardHeader>
             <div className="flex items-start justify-between">
@@ -111,8 +152,34 @@ const TaskTracker = () => {
             </div>
           </CardContent>
         </Card>
-      ))}
+        ))
+      )}
     </div>
+  );
+
+  return (
+    <Tabs defaultValue="all" onValueChange={(value) => setFilter(value as typeof filter)}>
+      <TabsList className="grid w-full grid-cols-3">
+        <TabsTrigger value="all">
+          Все ({allCount})
+        </TabsTrigger>
+        <TabsTrigger value="in-progress">
+          В процессе ({inProgressCount})
+        </TabsTrigger>
+        <TabsTrigger value="done">
+          Завершенные ({doneCount})
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent value="all">
+        <TaskList tasks={filteredTasks} />
+      </TabsContent>
+      <TabsContent value="in-progress">
+        <TaskList tasks={filteredTasks} />
+      </TabsContent>
+      <TabsContent value="done">
+        <TaskList tasks={filteredTasks} />
+      </TabsContent>
+    </Tabs>
   );
 };
 
