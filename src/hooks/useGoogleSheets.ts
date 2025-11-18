@@ -8,11 +8,23 @@ interface SheetData {
   values: string[][];
 }
 
-export const useGoogleSheets = (range: string = "Sheet1!A1:Z1000") => {
+export const useGoogleSheets = () => {
   return useQuery({
-    queryKey: ["googleSheets", range],
+    queryKey: ["googleSheets"],
     queryFn: async () => {
-      const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}?key=${API_KEY}`;
+      // Сначала получаем информацию о таблице, чтобы узнать имя первого листа
+      const metadataUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}?key=${API_KEY}`;
+      const metadataResponse = await fetch(metadataUrl);
+      
+      if (!metadataResponse.ok) {
+        throw new Error("Failed to fetch spreadsheet metadata");
+      }
+      
+      const metadata = await metadataResponse.json();
+      const firstSheetTitle = metadata.sheets[0]?.properties?.title || "Sheet1";
+      
+      // Теперь получаем данные из первого листа
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(firstSheetTitle)}?key=${API_KEY}`;
       const response = await fetch(url);
       
       if (!response.ok) {
