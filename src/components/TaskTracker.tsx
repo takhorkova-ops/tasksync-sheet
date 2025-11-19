@@ -9,10 +9,11 @@ import { CheckCircle2, Clock, AlertCircle } from "lucide-react";
 interface Task {
   id: string;
   title: string;
+  description: string;
   status: string;
-  priority: string;
-  assignee: string;
-  dueDate: string;
+  createdDate: string;
+  startDate: string;
+  completionDate: string;
 }
 
 const TaskTracker = () => {
@@ -55,12 +56,13 @@ const TaskTracker = () => {
   const rows = data.slice(1);
 
   const tasks: Task[] = rows.map((row, index) => ({
-    id: row[0] || `task-${index}`,
-    title: row[1] || "Без названия",
+    id: `task-${index}`,
+    title: row[0] || "Без названия",
+    description: row[1] || "",
     status: row[2] || "Не указан",
-    priority: row[3] || "Средний",
-    assignee: row[4] || "Не назначен",
-    dueDate: row[5] || "",
+    createdDate: row[3] || "",
+    startDate: row[4] || "",
+    completionDate: row[5] || "",
   }));
 
   const filterTasks = (tasks: Task[]) => {
@@ -105,16 +107,6 @@ const TaskTracker = () => {
     return <AlertCircle className="h-5 w-5 text-muted-foreground" />;
   };
 
-  const getPriorityVariant = (priority: string): "default" | "secondary" | "destructive" => {
-    const normalizedPriority = priority.toLowerCase();
-    if (normalizedPriority.includes("высок") || normalizedPriority.includes("high")) {
-      return "destructive";
-    }
-    if (normalizedPriority.includes("средн") || normalizedPriority.includes("medium")) {
-      return "default";
-    }
-    return "secondary";
-  };
 
   const TaskList = ({ tasks }: { tasks: Task[] }) => (
     <div className="space-y-4 mt-6">
@@ -128,26 +120,41 @@ const TaskTracker = () => {
         tasks.map((task) => (
         <Card key={task.id} className="hover:shadow-lg transition-shadow">
           <CardHeader>
-            <div className="flex items-start justify-between">
-              <div className="flex items-start gap-3">
-                {getStatusIcon(task.status)}
-                <div>
-                  <CardTitle className="text-lg">{task.title}</CardTitle>
-                  <CardDescription className="mt-1">
-                    Исполнитель: {task.assignee}
+            <div className="flex items-start gap-3">
+              {getStatusIcon(task.status)}
+              <div className="flex-1">
+                <CardTitle className="text-lg">{task.title}</CardTitle>
+                {task.description && (
+                  <CardDescription className="mt-2">
+                    {task.description}
                   </CardDescription>
-                </div>
+                )}
               </div>
-              <Badge variant={getPriorityVariant(task.priority)}>
-                {task.priority}
-              </Badge>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Статус: {task.status}</span>
-              {task.dueDate && (
-                <span className="text-muted-foreground">Срок: {task.dueDate}</span>
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Статус:</span>
+                <span className="font-medium">{task.status}</span>
+              </div>
+              {task.createdDate && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Дата создания:</span>
+                  <span>{task.createdDate}</span>
+                </div>
+              )}
+              {task.startDate && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Дата начала:</span>
+                  <span>{task.startDate}</span>
+                </div>
+              )}
+              {task.completionDate && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Дата завершения:</span>
+                  <span>{task.completionDate}</span>
+                </div>
               )}
             </div>
           </CardContent>
