@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useGoogleSheets } from "@/hooks/useGoogleSheets";
+import { useGoogleSheetsWrite } from "@/hooks/useGoogleSheetsWrite";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CheckCircle2, Clock, AlertCircle } from "lucide-react";
+import { TaskDialog } from "./TaskDialog";
 
 interface Task {
   id: string;
@@ -18,6 +20,7 @@ interface Task {
 
 const TaskTracker = () => {
   const { data, isLoading, error } = useGoogleSheets();
+  const { appendTask, updateTask } = useGoogleSheetsWrite();
   const [filter, setFilter] = useState<"all" | "in-progress" | "done">("all");
 
   if (isLoading) {
@@ -117,7 +120,7 @@ const TaskTracker = () => {
           </CardContent>
         </Card>
       ) : (
-        tasks.map((task) => (
+        tasks.map((task, index) => (
         <Card key={task.id} className="hover:shadow-lg transition-shadow">
           <CardHeader>
             <div className="flex items-start gap-3">
@@ -157,6 +160,15 @@ const TaskTracker = () => {
                 </div>
               )}
             </div>
+            <div className="flex justify-end mt-4 pt-4 border-t">
+              <TaskDialog
+                mode="edit"
+                task={task}
+                onSave={(updatedTask) => {
+                  updateTask.mutate({ rowIndex: index, task: updatedTask });
+                }}
+              />
+            </div>
           </CardContent>
         </Card>
         ))
@@ -165,7 +177,17 @@ const TaskTracker = () => {
   );
 
   return (
-    <Tabs defaultValue="all" onValueChange={(value) => setFilter(value as typeof filter)}>
+    <div className="w-full">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-semibold">Задачи</h2>
+        <TaskDialog
+          mode="create"
+          onSave={(newTask) => {
+            appendTask.mutate(newTask);
+          }}
+        />
+      </div>
+      <Tabs defaultValue="all" onValueChange={(value) => setFilter(value as typeof filter)}>
       <TabsList className="grid w-full grid-cols-3">
         <TabsTrigger value="all">
           Все ({allCount})
@@ -186,7 +208,8 @@ const TaskTracker = () => {
       <TabsContent value="done">
         <TaskList tasks={filteredTasks} />
       </TabsContent>
-    </Tabs>
+      </Tabs>
+    </div>
   );
 };
 
