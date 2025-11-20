@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CheckCircle2, Clock, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { CheckCircle2, Clock, AlertCircle, ArrowUpDown } from "lucide-react";
 import { TaskDialog } from "./TaskDialog";
 
 interface Task {
@@ -22,6 +23,7 @@ const TaskTracker = () => {
   const { data, isLoading, error } = useGoogleSheets();
   const { appendTask, updateTask } = useGoogleSheetsWrite();
   const [filter, setFilter] = useState<"all" | "in-progress" | "done">("all");
+  const [sortByDate, setSortByDate] = useState(false);
 
   if (isLoading) {
     return (
@@ -69,26 +71,43 @@ const TaskTracker = () => {
   }));
 
   const filterTasks = (tasks: Task[]) => {
-    if (filter === "all") return tasks;
+    let filtered = tasks;
     
     if (filter === "done") {
-      return tasks.filter(task => 
+      filtered = tasks.filter(task => 
         task.status.toLowerCase().includes("завершен") || 
         task.status.toLowerCase().includes("done")
       );
-    }
-    
-    if (filter === "in-progress") {
-      return tasks.filter(task => 
+    } else if (filter === "in-progress") {
+      filtered = tasks.filter(task => 
         task.status.toLowerCase().includes("процесс") || 
         task.status.toLowerCase().includes("progress")
       );
     }
+
+    if (sortByDate) {
+      filtered = [...filtered].sort((a, b) => {
+        const dateA = a.completionDate ? new Date(a.completionDate).getTime() : 0;
+        const dateB = b.completionDate ? new Date(b.completionDate).getTime() : 0;
+        return dateB - dateA;
+      });
+    }
     
-    return tasks;
+    return filtered;
   };
 
   const filteredTasks = filterTasks(tasks);
+
+  const getStatusBadge = (status: string) => {
+    const normalizedStatus = status.toLowerCase();
+    if (normalizedStatus.includes("завершен") || normalizedStatus.includes("done")) {
+      return <Badge variant="success" className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3" />{status}</Badge>;
+    }
+    if (normalizedStatus.includes("процесс") || normalizedStatus.includes("progress")) {
+      return <Badge variant="default" className="flex items-center gap-1"><Clock className="h-3 w-3" />{status}</Badge>;
+    }
+    return <Badge variant="secondary" className="flex items-center gap-1"><AlertCircle className="h-3 w-3" />{status}</Badge>;
+  };
   const allCount = tasks.length;
   const inProgressCount = tasks.filter(task => 
     task.status.toLowerCase().includes("процесс") || 
@@ -99,16 +118,6 @@ const TaskTracker = () => {
     task.status.toLowerCase().includes("done")
   ).length;
 
-  const getStatusIcon = (status: string) => {
-    const normalizedStatus = status.toLowerCase();
-    if (normalizedStatus.includes("завершен") || normalizedStatus.includes("done")) {
-      return <CheckCircle2 className="h-5 w-5 text-green-600" />;
-    }
-    if (normalizedStatus.includes("процесс") || normalizedStatus.includes("progress")) {
-      return <Clock className="h-5 w-5 text-blue-600" />;
-    }
-    return <AlertCircle className="h-5 w-5 text-muted-foreground" />;
-  };
 
 
   const TaskList = ({ tasks }: { tasks: Task[] }) => (
@@ -121,26 +130,22 @@ const TaskTracker = () => {
         </Card>
       ) : (
         tasks.map((task, index) => (
-        <Card key={task.id} className="hover:shadow-lg transition-shadow">
+        <Card key={task.id} className="hover:shadow-lg transition-shadow border-l-4 border-l-primary/30">
           <CardHeader>
-            <div className="flex items-start gap-3">
-              {getStatusIcon(task.status)}
+            <div className="flex items-start justify-between gap-3">
               <div className="flex-1">
-                <CardTitle className="text-lg">{task.title}</CardTitle>
+                <CardTitle className="text-lg mb-2">{task.title}</CardTitle>
                 {task.description && (
-                  <CardDescription className="mt-2">
+                  <CardDescription className="mt-1">
                     {task.description}
                   </CardDescription>
                 )}
               </div>
+              {getStatusBadge(task.status)}
             </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-2 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Статус:</span>
-                <span className="font-medium">{task.status}</span>
-              </div>
               {task.createdDate && (
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Дата создания:</span>
@@ -179,13 +184,24 @@ const TaskTracker = () => {
   return (
     <div className="w-full">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-semibold">Задачи</h2>
-        <TaskDialog
-          mode="create"
-          onSave={(newTask) => {
-            appendTask.mutate(newTask);
-          }}
-        />
+        <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Задачи</h2>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setSortByDate(!sortByDate)}
+            className="flex items-center gap-2"
+          >
+            <ArrowUpDown className="h-4 w-4" />
+            {sortByDate ? "Сброс" : "По дате"}
+          </Button>
+          <TaskDialog
+            mode="create"
+            onSave={(newTask) => {
+              appendTask.mutate(newTask);
+            }}
+          />
+        </div>
       </div>
       <Tabs defaultValue="all" onValueChange={(value) => setFilter(value as typeof filter)}>
       <TabsList className="grid w-full grid-cols-3">
