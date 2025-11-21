@@ -98,7 +98,7 @@ const TaskTracker = () => {
 
   const filteredTasks = filterTasks(tasks);
 
-  const isOverdue = (completionDate: string, status: string) => {
+  const isOverdue = (completionDate: string, status: string, title: string) => {
     if (!completionDate) return false;
     const normalizedStatus = status.toLowerCase();
     const isInProgress = normalizedStatus.includes("процесс") || normalizedStatus.includes("progress");
@@ -106,7 +106,23 @@ const TaskTracker = () => {
     
     const completionTime = new Date(completionDate).getTime();
     const currentTime = new Date().getTime();
-    return completionTime < currentTime;
+    const result = completionTime < currentTime;
+    
+    // Debug logging for "Урок английского"
+    if (title.includes("Урок английского")) {
+      console.log("=== Debug Урок английского ===");
+      console.log("Title:", title);
+      console.log("Status:", status);
+      console.log("Normalized Status:", normalizedStatus);
+      console.log("Is In Progress:", isInProgress);
+      console.log("Completion Date String:", completionDate);
+      console.log("Completion Time:", completionTime);
+      console.log("Current Time:", currentTime);
+      console.log("Is Overdue:", result);
+      console.log("============================");
+    }
+    
+    return result;
   };
 
   const getStatusBadge = (status: string) => {
@@ -172,7 +188,7 @@ const TaskTracker = () => {
               {task.completionDate && (
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Дата завершения:</span>
-                  <span className={isOverdue(task.completionDate, task.status) ? "text-destructive font-semibold" : ""}>
+                  <span className={isOverdue(task.completionDate, task.status, task.title) ? "text-destructive font-semibold" : ""}>
                     {task.completionDate}
                   </span>
                 </div>
