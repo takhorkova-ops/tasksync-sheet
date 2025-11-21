@@ -98,8 +98,12 @@ const TaskTracker = () => {
 
   const filteredTasks = filterTasks(tasks);
 
-  const isOverdue = (completionDate: string) => {
+  const isOverdue = (completionDate: string, status: string) => {
     if (!completionDate) return false;
+    const normalizedStatus = status.toLowerCase();
+    const isInProgress = normalizedStatus.includes("процесс") || normalizedStatus.includes("progress");
+    if (!isInProgress) return false;
+    
     const completionTime = new Date(completionDate).getTime();
     const currentTime = new Date().getTime();
     return completionTime < currentTime;
@@ -168,7 +172,7 @@ const TaskTracker = () => {
               {task.completionDate && (
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Дата завершения:</span>
-                  <span className={isOverdue(task.completionDate) ? "text-destructive font-semibold" : ""}>
+                  <span className={isOverdue(task.completionDate, task.status) ? "text-destructive font-semibold" : ""}>
                     {task.completionDate}
                   </span>
                 </div>
