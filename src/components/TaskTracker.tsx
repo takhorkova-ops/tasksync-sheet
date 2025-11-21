@@ -98,13 +98,36 @@ const TaskTracker = () => {
 
   const filteredTasks = filterTasks(tasks);
 
+  const parseDate = (dateStr: string): Date | null => {
+    if (!dateStr) return null;
+    
+    // Пробуем парсить формат DD/MM/YYYY
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1; // месяцы в JS начинаются с 0
+      const year = parseInt(parts[2], 10);
+      
+      if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+        return new Date(year, month, day);
+      }
+    }
+    
+    // Если не получилось, пробуем стандартный парсинг
+    const date = new Date(dateStr);
+    return isNaN(date.getTime()) ? null : date;
+  };
+
   const isOverdue = (completionDate: string, status: string, title: string) => {
     if (!completionDate) return false;
     const normalizedStatus = status.toLowerCase();
     const isInProgress = normalizedStatus.includes("процесс") || normalizedStatus.includes("progress");
     if (!isInProgress) return false;
     
-    const completionTime = new Date(completionDate).getTime();
+    const parsedDate = parseDate(completionDate);
+    if (!parsedDate) return false;
+    
+    const completionTime = parsedDate.getTime();
     const currentTime = new Date().getTime();
     const result = completionTime < currentTime;
     
@@ -116,6 +139,7 @@ const TaskTracker = () => {
       console.log("Normalized Status:", normalizedStatus);
       console.log("Is In Progress:", isInProgress);
       console.log("Completion Date String:", completionDate);
+      console.log("Parsed Date:", parsedDate);
       console.log("Completion Time:", completionTime);
       console.log("Current Time:", currentTime);
       console.log("Is Overdue:", result);
