@@ -22,7 +22,7 @@ interface Task {
 const TaskTracker = () => {
   const { data, isLoading, error } = useGoogleSheets();
   const { appendTask, updateTask } = useGoogleSheetsWrite();
-  const [filter, setFilter] = useState<"all" | "in-progress" | "done">("all");
+  const [filter, setFilter] = useState<"all" | "in-progress" | "done">("in-progress");
   const [sortByDate, setSortByDate] = useState(false);
 
   if (isLoading) {
@@ -98,6 +98,13 @@ const TaskTracker = () => {
 
   const filteredTasks = filterTasks(tasks);
 
+  const isOverdue = (completionDate: string) => {
+    if (!completionDate) return false;
+    const completionTime = new Date(completionDate).getTime();
+    const currentTime = new Date().getTime();
+    return completionTime < currentTime;
+  };
+
   const getStatusBadge = (status: string) => {
     const normalizedStatus = status.toLowerCase();
     if (normalizedStatus.includes("завершен") || normalizedStatus.includes("done")) {
@@ -161,7 +168,9 @@ const TaskTracker = () => {
               {task.completionDate && (
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Дата завершения:</span>
-                  <span>{task.completionDate}</span>
+                  <span className={isOverdue(task.completionDate) ? "text-destructive font-semibold" : ""}>
+                    {task.completionDate}
+                  </span>
                 </div>
               )}
             </div>
@@ -203,7 +212,7 @@ const TaskTracker = () => {
           />
         </div>
       </div>
-      <Tabs defaultValue="all" onValueChange={(value) => setFilter(value as typeof filter)}>
+      <Tabs defaultValue="in-progress" onValueChange={(value) => setFilter(value as typeof filter)}>
       <TabsList className="grid w-full grid-cols-3">
         <TabsTrigger value="all">
           Все ({allCount})
