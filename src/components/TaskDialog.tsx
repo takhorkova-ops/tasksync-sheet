@@ -1,43 +1,54 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Plus, Pencil } from "lucide-react";
-
-interface Task {
-  id: string;
-  title: string;
-  description: string;
-  status: string;
-  createdDate: string;
-  startDate: string;
-  completionDate: string;
-}
+import { Task } from "@/hooks/useTasks";
 
 interface TaskDialogProps {
   task?: Task;
   mode: "create" | "edit";
-  onSave: (task: Omit<Task, "id">) => void;
+  onSave: (data: Omit<Task, "id" | "creation_date">) => void;
 }
 
-export const TaskDialog = ({ task, mode, onSave }: TaskDialogProps) => {
+const TaskDialog = ({ task, mode, onSave }: TaskDialogProps) => {
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
     title: task?.title || "",
     description: task?.description || "",
-    status: task?.status || "To do",
-    createdDate: task?.createdDate || new Date().toLocaleDateString("ru-RU"),
-    startDate: task?.startDate || "",
-    completionDate: task?.completionDate || "",
+    status: task?.status || "В процессе",
+    start_date: task?.start_date || "",
+    completion_date: task?.completion_date || "",
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave(formData);
     setOpen(false);
+    if (mode === "create") {
+      setFormData({
+        title: "",
+        description: "",
+        status: "В процессе",
+        start_date: "",
+        completion_date: "",
+      });
+    }
   };
 
   return (
@@ -51,11 +62,11 @@ export const TaskDialog = ({ task, mode, onSave }: TaskDialogProps) => {
         ) : (
           <Button variant="outline" size="sm" className="gap-2">
             <Pencil className="h-4 w-4" />
-            Редактировать
+            Изменить
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>
             {mode === "create" ? "Новая задача" : "Редактировать задачу"}
@@ -63,79 +74,74 @@ export const TaskDialog = ({ task, mode, onSave }: TaskDialogProps) => {
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="title">Название задачи</Label>
+            <Label htmlFor="title">Название</Label>
             <Input
               id="title"
               value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, title: e.target.value })
+              }
               required
             />
           </div>
-
           <div className="space-y-2">
             <Label htmlFor="description">Описание</Label>
             <Textarea
               id="description"
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, description: e.target.value })
+              }
               rows={3}
             />
           </div>
-
           <div className="space-y-2">
             <Label htmlFor="status">Статус</Label>
             <Select
               value={formData.status}
-              onValueChange={(value) => setFormData({ ...formData, status: value })}
+              onValueChange={(value) =>
+                setFormData({ ...formData, status: value })
+              }
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="To do">To do</SelectItem>
-                <SelectItem value="In progress">In progress</SelectItem>
-                <SelectItem value="Done">Done</SelectItem>
+                <SelectItem value="В процессе">В процессе</SelectItem>
+                <SelectItem value="Выполнено">Выполнено</SelectItem>
               </SelectContent>
             </Select>
           </div>
-
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="createdDate">Дата создания</Label>
+              <Label htmlFor="start_date">Дата начала</Label>
               <Input
-                id="createdDate"
-                type="text"
-                value={formData.createdDate}
-                onChange={(e) => setFormData({ ...formData, createdDate: e.target.value })}
-                placeholder="ДД/ММ/ГГГГ"
+                id="start_date"
+                type="date"
+                value={formData.start_date}
+                onChange={(e) =>
+                  setFormData({ ...formData, start_date: e.target.value })
+                }
               />
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="startDate">Дата начала</Label>
+              <Label htmlFor="completion_date">Дата завершения</Label>
               <Input
-                id="startDate"
-                type="text"
-                value={formData.startDate}
-                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                placeholder="ДД/ММ/ГГГГ"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="completionDate">Дата завершения</Label>
-              <Input
-                id="completionDate"
-                type="text"
-                value={formData.completionDate}
-                onChange={(e) => setFormData({ ...formData, completionDate: e.target.value })}
-                placeholder="ДД/ММ/ГГГГ"
+                id="completion_date"
+                type="date"
+                value={formData.completion_date}
+                onChange={(e) =>
+                  setFormData({ ...formData, completion_date: e.target.value })
+                }
               />
             </div>
           </div>
-
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+            >
               Отмена
             </Button>
             <Button type="submit">Сохранить</Button>
@@ -145,3 +151,5 @@ export const TaskDialog = ({ task, mode, onSave }: TaskDialogProps) => {
     </Dialog>
   );
 };
+
+export default TaskDialog;
