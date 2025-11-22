@@ -1,285 +1,222 @@
-import { useState } from "react";
-import { useGoogleSheets } from "@/hooks/useGoogleSheets";
-import { useGoogleSheetsWrite } from "@/hooks/useGoogleSheetsWrite";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useMemo, useState, memo } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { CheckCircle2, Clock, AlertCircle, ArrowUpDown } from "lucide-react";
-import { TaskDialog } from "./TaskDialog";
-
-interface Task {
-  id: string;
-  title: string;
-  description: string;
-  status: string;
-  createdDate: string;
-  startDate: string;
-  completionDate: string;
-}
+import { Clock, CheckCircle2, AlertCircle, Calendar, ArrowUpDown, Trash2 } from "lucide-react";
+import TaskDialog from "./TaskDialog";
+import { useTasks, Task } from "@/hooks/useTasks";
+import { format } from "date-fns";
+import { ru } from "date-fns/locale";
 
 const TaskTracker = () => {
-  const { data, isLoading, error } = useGoogleSheets();
-  const { appendTask, updateTask } = useGoogleSheetsWrite();
-  const [filter, setFilter] = useState<"all" | "in-progress" | "done">("in-progress");
+  const { tasks, isLoading, error, createTask, updateTask, deleteTask } = useTasks();
+  const [filter, setFilter] = useState<"all" | "in-progress" | "done">("all");
   const [sortByDate, setSortByDate] = useState(false);
+
+  const filterTasks = (tasks: Task[]) => {
+    let filtered = tasks;
+
+    if (filter === "in-progress") {
+      filtered = tasks.filter((task) => task.status === "В процессе");
+    } else if (filter === "done") {
+      filtered = tasks.filter((task) => task.status === "Выполнено");
+    }
+
+    if (sortByDate) {
+      filtered = [...filtered].sort((a, b) => {
+        const dateA = a.completion_date ? new Date(a.completion_date).getTime() : 0;
+        const dateB = b.completion_date ? new Date(b.completion_date).getTime() : 0;
+        return dateA - dateB;
+      });
+    }
+
+    return filtered;
+  };
+
+  const isOverdue = (completionDate: string | null, status: string): boolean => {
+    if (!completionDate || status === "Выполнено") return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dueDate = new Date(completionDate);
+    dueDate.setHours(0, 0, 0, 0);
+    return dueDate < today;
+  };
+
+  const getStatusBadge = (status: string, completionDate: string | null) => {
+    const overdue = isOverdue(completionDate, status);
+
+    if (status === "Выполнено") {
+      return (
+        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+          <CheckCircle2 className="w-3 h-3 mr-1" />
+          Выполнено
+        </Badge>
+      );
+    }
+
+    if (overdue) {
+      return (
+        <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+          <AlertCircle className="w-3 h-3 mr-1" />
+          Просрочено
+        </Badge>
+      );
+    }
+
+    return (
+      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+        <Clock className="w-3 h-3 mr-1" />
+        В процессе
+      </Badge>
+    );
+  };
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return "Не указана";
+    try {
+      return format(new Date(dateStr), "d MMMM yyyy", { locale: ru });
+    } catch {
+      return dateStr;
+    }
+  };
 
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-64 w-full" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <Card className="border-destructive">
-        <CardHeader>
-          <CardTitle className="text-destructive">Ошибка загрузки данных</CardTitle>
-          <CardDescription>Не удалось загрузить данные из Google Sheets</CardDescription>
-        </CardHeader>
+      <Card className="border-red-200 bg-red-50">
+        <CardContent className="pt-6">
+          <p className="text-red-600">Ошибка загрузки задач</p>
+        </CardContent>
       </Card>
     );
   }
 
-  if (!data || data.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Нет данных</CardTitle>
-          <CardDescription>Таблица пуста или данные недоступны</CardDescription>
-        </CardHeader>
-      </Card>
-    );
-  }
-
-  const headers = data[0];
-  const rows = data.slice(1);
-
-  const tasks: Task[] = rows.map((row, index) => ({
-    id: `task-${index}`,
-    title: row[0] || "Без названия",
-    description: row[1] || "",
-    status: row[2] || "Не указан",
-    createdDate: row[3] || "",
-    startDate: row[4] || "",
-    completionDate: row[5] || "",
-  }));
-
-  const filterTasks = (tasks: Task[]) => {
-    let filtered = tasks;
-    
-    if (filter === "done") {
-      filtered = tasks.filter(task => 
-        task.status.toLowerCase().includes("завершен") || 
-        task.status.toLowerCase().includes("done")
-      );
-    } else if (filter === "in-progress") {
-      filtered = tasks.filter(task => 
-        task.status.toLowerCase().includes("процесс") || 
-        task.status.toLowerCase().includes("progress")
-      );
-    }
-
-    if (sortByDate) {
-      filtered = [...filtered].sort((a, b) => {
-        const dateA = a.completionDate ? new Date(a.completionDate).getTime() : 0;
-        const dateB = b.completionDate ? new Date(b.completionDate).getTime() : 0;
-        return dateB - dateA;
-      });
-    }
-    
-    return filtered;
-  };
-
-  const filteredTasks = filterTasks(tasks);
-
-  const parseDate = (dateStr: string): Date | null => {
-    if (!dateStr) return null;
-    
-    // Пробуем парсить формат DD/MM/YYYY
-    const parts = dateStr.split('/');
-    if (parts.length === 3) {
-      const day = parseInt(parts[0], 10);
-      const month = parseInt(parts[1], 10) - 1; // месяцы в JS начинаются с 0
-      const year = parseInt(parts[2], 10);
-      
-      if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
-        return new Date(year, month, day);
-      }
-    }
-    
-    // Если не получилось, пробуем стандартный парсинг
-    const date = new Date(dateStr);
-    return isNaN(date.getTime()) ? null : date;
-  };
-
-  const isOverdue = (completionDate: string, status: string, title: string) => {
-    if (!completionDate) return false;
-    const normalizedStatus = status.toLowerCase();
-    const isInProgress = normalizedStatus.includes("процесс") || normalizedStatus.includes("progress");
-    if (!isInProgress) return false;
-    
-    const parsedDate = parseDate(completionDate);
-    if (!parsedDate) return false;
-    
-    const completionTime = parsedDate.getTime();
-    const currentTime = new Date().getTime();
-    const result = completionTime < currentTime;
-    
-    // Debug logging for "Урок английского"
-    if (title.includes("Урок английского")) {
-      console.log("=== Debug Урок английского ===");
-      console.log("Title:", title);
-      console.log("Status:", status);
-      console.log("Normalized Status:", normalizedStatus);
-      console.log("Is In Progress:", isInProgress);
-      console.log("Completion Date String:", completionDate);
-      console.log("Parsed Date:", parsedDate);
-      console.log("Completion Time:", completionTime);
-      console.log("Current Time:", currentTime);
-      console.log("Is Overdue:", result);
-      console.log("============================");
-    }
-    
-    return result;
-  };
-
-  const getStatusBadge = (status: string) => {
-    const normalizedStatus = status.toLowerCase();
-    if (normalizedStatus.includes("завершен") || normalizedStatus.includes("done")) {
-      return <Badge variant="success" className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3" />{status}</Badge>;
-    }
-    if (normalizedStatus.includes("процесс") || normalizedStatus.includes("progress")) {
-      return <Badge variant="default" className="flex items-center gap-1"><Clock className="h-3 w-3" />{status}</Badge>;
-    }
-    return <Badge variant="secondary" className="flex items-center gap-1"><AlertCircle className="h-3 w-3" />{status}</Badge>;
-  };
-  const allCount = tasks.length;
-  const inProgressCount = tasks.filter(task => 
-    task.status.toLowerCase().includes("процесс") || 
-    task.status.toLowerCase().includes("progress")
-  ).length;
-  const doneCount = tasks.filter(task => 
-    task.status.toLowerCase().includes("завершен") || 
-    task.status.toLowerCase().includes("done")
-  ).length;
+  const filteredTasks = filterTasks(tasks || []);
+  const inProgressCount = tasks?.filter((t) => t.status === "В процессе").length || 0;
+  const doneCount = tasks?.filter((t) => t.status === "Выполнено").length || 0;
 
 
-
-  const TaskList = ({ tasks }: { tasks: Task[] }) => (
-    <div className="space-y-4 mt-6">
-      {tasks.length === 0 ? (
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-center text-muted-foreground">Задачи не найдены</p>
-          </CardContent>
-        </Card>
-      ) : (
-        tasks.map((task, index) => (
-        <Card key={task.id} className="hover:shadow-lg transition-shadow border-l-4 border-l-primary/30">
-          <CardHeader>
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1">
-                <CardTitle className="text-lg mb-2">{task.title}</CardTitle>
-                {task.description && (
-                  <CardDescription className="mt-1">
-                    {task.description}
-                  </CardDescription>
-                )}
-              </div>
-              {getStatusBadge(task.status)}
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 text-sm">
-              {task.createdDate && (
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Дата создания:</span>
-                  <span>{task.createdDate}</span>
-                </div>
-              )}
-              {task.startDate && (
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Дата начала:</span>
-                  <span>{task.startDate}</span>
-                </div>
-              )}
-              {task.completionDate && (
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Дата завершения:</span>
-                  <span className={isOverdue(task.completionDate, task.status, task.title) ? "text-destructive font-semibold" : ""}>
-                    {task.completionDate}
-                  </span>
-                </div>
-              )}
-            </div>
-            <div className="flex justify-end mt-4 pt-4 border-t">
-              <TaskDialog
-                mode="edit"
-                task={task}
-                onSave={(updatedTask) => {
-                  updateTask.mutate({ rowIndex: index, task: updatedTask });
-                }}
-              />
-            </div>
-          </CardContent>
-        </Card>
-        ))
-      )}
-    </div>
-  );
 
   return (
-    <div className="w-full">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Задачи</h2>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h1 className="text-3xl font-bold">Мои задачи</h1>
         <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            size="sm"
+          <Button
+            variant="outline"
             onClick={() => setSortByDate(!sortByDate)}
-            className="flex items-center gap-2"
+            className="gap-2"
           >
             <ArrowUpDown className="h-4 w-4" />
-            {sortByDate ? "Сброс" : "По дате"}
+            {sortByDate ? "По дате" : "По умолчанию"}
           </Button>
           <TaskDialog
             mode="create"
-            onSave={(newTask) => {
-              appendTask.mutate(newTask);
-            }}
+            onSave={(data) => createTask.mutate(data)}
           />
         </div>
       </div>
-      <Tabs defaultValue="in-progress" onValueChange={(value) => setFilter(value as typeof filter)}>
-      <TabsList className="grid w-full grid-cols-3">
-        <TabsTrigger value="all">
-          Все ({allCount})
-        </TabsTrigger>
-        <TabsTrigger value="in-progress">
-          В процессе ({inProgressCount})
-        </TabsTrigger>
-        <TabsTrigger value="done">
-          Завершенные ({doneCount})
-        </TabsTrigger>
-      </TabsList>
-      <TabsContent value="all">
-        <TaskList tasks={filteredTasks} />
-      </TabsContent>
-      <TabsContent value="in-progress">
-        <TaskList tasks={filteredTasks} />
-      </TabsContent>
-      <TabsContent value="done">
-        <TaskList tasks={filteredTasks} />
-      </TabsContent>
+
+      <Tabs value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="all">Все ({tasks?.length || 0})</TabsTrigger>
+          <TabsTrigger value="in-progress">В процессе ({inProgressCount})</TabsTrigger>
+          <TabsTrigger value="done">Выполнено ({doneCount})</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value={filter} className="mt-6">
+          <TaskList
+            tasks={filteredTasks}
+            getStatusBadge={getStatusBadge}
+            formatDate={formatDate}
+            onUpdate={(id, data) => updateTask.mutate({ id, ...data })}
+            onDelete={(id) => deleteTask.mutate(id)}
+          />
+        </TabsContent>
       </Tabs>
     </div>
   );
 };
+
+interface TaskListProps {
+  tasks: Task[];
+  getStatusBadge: (status: string, completionDate: string | null) => JSX.Element;
+  formatDate: (date: string | null) => string;
+  onUpdate: (id: string, data: Omit<Task, "id" | "creation_date">) => void;
+  onDelete: (id: string) => void;
+}
+
+const TaskList = memo(({ tasks, getStatusBadge, formatDate, onUpdate, onDelete }: TaskListProps) => {
+  if (tasks.length === 0) {
+    return (
+      <Card>
+        <CardContent className="pt-6 text-center text-muted-foreground">
+          Нет задач в этой категории
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {tasks.map((task) => (
+        <Card key={task.id} className="hover:shadow-lg transition-shadow">
+          <CardHeader>
+            <div className="flex justify-between items-start gap-2">
+              <CardTitle className="text-lg line-clamp-2">{task.title}</CardTitle>
+              {getStatusBadge(task.status, task.completion_date)}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {task.description && (
+              <p className="text-sm text-muted-foreground line-clamp-3">
+                {task.description}
+              </p>
+            )}
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Calendar className="h-4 w-4" />
+                <span>Начало: {formatDate(task.start_date)}</span>
+              </div>
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Calendar className="h-4 w-4" />
+                <span>Завершение: {formatDate(task.completion_date)}</span>
+              </div>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <TaskDialog
+                mode="edit"
+                task={task}
+                onSave={(data) => onUpdate(task.id, data)}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onDelete(task.id)}
+                className="gap-2 text-red-600 hover:text-red-700"
+              >
+                <Trash2 className="h-4 w-4" />
+                Удалить
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+});
+
+TaskList.displayName = "TaskList";
 
 export default TaskTracker;
